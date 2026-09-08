@@ -1,0 +1,238 @@
+PRAGMA foreign_keys = ON;
+DROP TABLE IF EXISTS release_decisions;
+DROP TABLE IF EXISTS previous_deployments;
+DROP TABLE IF EXISTS open_issues;
+DROP TABLE IF EXISTS service_health_checks;
+DROP TABLE IF EXISTS test_results;
+DROP TABLE IF EXISTS releases;
+CREATE TABLE releases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service TEXT NOT NULL,
+    version TEXT NOT NULL,
+    environment TEXT NOT NULL CHECK (
+        environment IN ('development', 'staging', 'production')
+    ),
+    requested_by TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'approved', 'review', 'blocked', 'deployed')
+    ),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (service, version, environment)
+);
+CREATE TABLE test_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    release_id INTEGER NOT NULL,
+    passed INTEGER NOT NULL DEFAULT 0 CHECK (passed >= 0),
+    failed INTEGER NOT NULL DEFAULT 0 CHECK (failed >= 0),
+    status TEXT NOT NULL CHECK (status IN ('passed', 'failed')),
+    checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE
+);
+CREATE TABLE service_health_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    release_id INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN ('healthy', 'degraded', 'unhealthy')
+    ),
+    response_time_ms INTEGER CHECK (response_time_ms >= 0),
+    checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE
+);
+CREATE TABLE open_issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    release_id INTEGER NOT NULL,
+    external_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (
+        severity IN ('low', 'medium', 'high', 'critical')
+    ),
+    status TEXT NOT NULL DEFAULT 'open' CHECK (
+        status IN ('open', 'in_progress', 'resolved')
+    ),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE,
+    UNIQUE (release_id, external_id)
+);
+CREATE TABLE previous_deployments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service TEXT NOT NULL,
+    version TEXT NOT NULL,
+    environment TEXT NOT NULL CHECK (
+        environment IN ('development', 'staging', 'production')
+    ),
+    status TEXT NOT NULL CHECK (
+        status IN ('success', 'failed', 'rolled_back')
+    ),
+    deployed_at TEXT NOT NULL,
+    deployed_by TEXT NOT NULL
+);
+CREATE TABLE release_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    release_id INTEGER NOT NULL,
+    risk_level TEXT NOT NULL CHECK (risk_level IN ('low', 'medium', 'high')),
+    decision TEXT NOT NULL CHECK (decision IN ('DEPLOY', 'REVIEW', 'BLOCK')),
+    requires_human_review INTEGER NOT NULL CHECK (
+        requires_human_review IN (0, 1)
+    ),
+    reasons TEXT NOT NULL DEFAULT '[]',
+    decided_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_releases_service_environment
+ON releases(service, environment);
+CREATE INDEX idx_previous_deployments_lookup
+ON previous_deployments(service, environment, deployed_at DESC);
+CREATE INDEX idx_open_issues_release_severity
+ON open_issues(release_id, severity, status);
+INSERT INTO releases (
+    id,
+    service,
+    version,
+    environment,
+    requested_by,
+    status,
+    created_at
+) VALUES
+    (
+        1,
+        'payments-api',
+        '1.4.0',
+        'production',
+        'david',
+        'approved',
+        '2026-09-08 09:15:00'
+    ),
+    (
+        2,
+        'profile-api',
+        '2.0.0',
+        'staging',
+        'ana',
+        'review',
+        '2026-09-08 10:30:00'
+    ),
+    (
+        3,
+        'notifications-api',
+        '3.1.2',
+        'production',
+        'marta',
+        'blocked',
+        '2026-09-08 11:45:00'
+    );
+INSERT INTO test_results (
+    release_id,
+    passed,
+    failed,
+    status,
+    checked_at
+) VALUES
+    (1, 42, 0, 'passed', '2026-09-08 09:20:00'),
+    (2, 35, 1, 'failed', '2026-09-08 10:36:00'),
+    (3, 58, 0, 'passed', '2026-09-08 11:51:00');
+INSERT INTO service_health_checks (
+    release_id,
+    status,
+    response_time_ms,
+    checked_at
+) VALUES
+    (1, 'healthy', 120, '2026-09-08 09:21:00'),
+    (2, 'degraded', 420, '2026-09-08 10:37:00'),
+    (3, 'unhealthy', 950, '2026-09-08 11:52:00');
+INSERT INTO open_issues (
+    release_id,
+    external_id,
+    title,
+    severity,
+    status,
+    created_at
+) VALUES
+    (
+        1,
+        'ISSUE-101',
+        'Improve retry logging for payment provider timeout',
+        'high',
+        'open',
+        '2026-09-07 16:10:00'
+    ),
+    (
+        1,
+        'ISSUE-102',
+        'Update dashboard copy for refund state',
+        'low',
+        'open',
+        '2026-09-07 17:05:00'
+    ),
+    (
+        2,
+        'ISSUE-201',
+        'Regression in profile avatar upload',
+        'critical',
+        'open',
+        '2026-09-08 08:40:00'
+    ),
+    (
+        3,
+        'ISSUE-301',
+        'Notification delivery latency above threshold',
+        'critical',
+        'in_progress',
+        '2026-09-08 09:05:00'
+    );
+INSERT INTO previous_deployments (
+    service,
+    version,
+    environment,
+    status,
+    deployed_at,
+    deployed_by
+) VALUES
+    (
+        'payments-api',
+        '1.3.9',
+        'production',
+        'success',
+        '2026-09-06 18:30:00',
+        'david'
+    ),
+    (
+        'profile-api',
+        '1.9.8',
+        'staging',
+        'success',
+        '2026-09-07 12:10:00',
+        'ana'
+    ),
+    (
+        'notifications-api',
+        '3.1.1',
+        'production',
+        'failed',
+        '2026-09-07 19:45:00',
+        'marta'
+    );
+INSERT INTO release_decisions (
+    release_id,
+    risk_level,
+    decision,
+    requires_human_review,
+    reasons,
+    decided_at
+) VALUES
+    (1, 'low', 'DEPLOY', 0, '[]', '2026-09-08 09:25:00'),
+    (
+        2,
+        'high',
+        'BLOCK',
+        1,
+        '["Tests are failing", "Critical issues are open"]',
+        '2026-09-08 10:42:00'
+    ),
+    (
+        3,
+        'high',
+        'BLOCK',
+        1,
+        '["Service is unhealthy", "Critical issues are open", "Previous deployment failed"]',
+        '2026-09-08 11:58:00'
+    );
