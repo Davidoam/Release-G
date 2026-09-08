@@ -1,6 +1,8 @@
 FROM node:20-alpine
 
-WORKDIR /desktop/Release-G
+WORKDIR /app
+
+RUN apk add --no-cache sqlite
 
 COPY package*.json ./
 

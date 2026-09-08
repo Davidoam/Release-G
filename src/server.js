@@ -1,8 +1,12 @@
 const express = require("express");
 const { runReleaseAgent } = require("./agent/agent");
+const {
+    getReleaseHistory,
+    saveReleaseDecision
+} = require("./database/db");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -13,12 +17,16 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
     res.status(200).json({
         ok: true,
+        app: process.env.APP_NAME || "release-g",
         mensaje: "Solicitud procesada con exito"
     });
 });
 
 app.get("/ready", (req, res) => {
-    res.send("We are Ready!!!");
+    res.status(200).json({
+        ok: true,
+        ready: true
+    });
 });
 
 app.post("/release/decision", async (req, res) => {
@@ -38,6 +46,16 @@ app.post("/release/decision", async (req, res) => {
         requestedBy
     });
 
+    saveReleaseDecision(
+        {
+            version,
+            environment,
+            service,
+            requestedBy
+        },
+        result
+    );
+
     res.status(200).json({
         ok: true,
         result
@@ -47,7 +65,7 @@ app.post("/release/decision", async (req, res) => {
 app.get("/release/history", (req, res) => {
     res.status(200).json({
         ok: true,
-        history: []
+        history: getReleaseHistory()
     });
 });
 
