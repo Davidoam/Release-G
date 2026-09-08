@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-guardian
+  labels:
+    app: release-guardian
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: release-guardian
+  template:
+    metadata:
+      labels:
+        app: release-guardian
+    spec:
+      containers:
+        - name: release-guardian
+          image: release-guardian:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: release-guardian-config
+          env:
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: release-guardian-secret
+                  key: API_KEY
+          volumeMounts:
+            - name: release-guardian-data
+              mountPath: /app/data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources: {}
+      volumes:
+        - name: release-guardian-data
+          persistentVolumeClaim:
+            claimName: release-guardian-pvc
