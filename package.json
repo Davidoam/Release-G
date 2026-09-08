@@ -1,0 +1,24 @@
+{
+  "name": "release-g",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Davidoam/Release-G.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Davidoam/Release-G/issues"
+  },
+  "homepage": "https://github.com/Davidoam/Release-G#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
